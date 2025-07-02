@@ -1,0 +1,284 @@
+version: '3.8'
+
+services:
+  agent-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
+      - FLOW_NETWORK=testnet
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=github_protection
+      - POSTGRES_USER=agent
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+
+---
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 agent && chown -R agent:agent /app
+USER agent
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Start command
+CMD ["uvicorn", "agent_fastapi_server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+---
+# requirements.txt
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+langchain==0.0.350
+langchain-anthropic==0.0.1
+llama-index==0.9.13
+llama-index-embeddings-huggingface==0.1.4
+viem==0.1.0
+web3==6.12.0
+requests==2.31.0
+aiohttp==3.9.1
+GitPython==3.1.40
+reportlab==4.0.7
+python-multipart==0.0.6
+python-dotenv==1.0.0
+redis==5.0.1
+psycopg2-binary==2.9.9
+celery==5.3.4
+sentence-transformers==2.2.2
+transformers==4.36.0
+torch==2.1.1
+numpy==1.24.4
+pandas==2.1.4
+scikit-learn==1.3.2
+
+# Development dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+
+---
+# .env.example
+# Copy this to .env and fill in your values
+
+# API Keys
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+GITHUB_TOKEN=your_github_token_here
+
+# Blockchain
+PRIVATE_KEY=your_private_key_here
+CONTRACT_ADDRESS=0x1234567890123456789012345678901234567890
+
+# Database
+POSTGRES_PASSWORD=your_postgres_password_here
+
+# Optional
+REDIS_URL=redis://localhost:6379
+DATABASE_URL=postgresql://agent:password@localhost:5432/github_protection
+
+# Flow Network Configuration
+FLOW_NETWORK=testnet
+FLOW_RPC_URL=https://testnet.evm.nodes.onflow.org
+
+---
+# init.sql
+-- Database initialization script
+
+CREATE TABLE IF NOT EXISTS repositories (
+    id SERIAL PRIMARY KEY,
+    blockchain_id INTEGER UNIQUE,
+    owner_address VARCHAR(42) NOT NULL,
+    github_url TEXT NOT NULL,
+    repo_hash VARCHAR(64) UNIQUE NOT NULL,
+    fingerprint VARCHAR(64) NOT NULL,
+    key_features JSONB,
+    license_type VARCHAR(50),
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    metadata JSONB
+);
+
+CREATE TABLE IF NOT EXISTS violations (
+    id SERIAL PRIMARY KEY,
+    blockchain_id INTEGER UNIQUE,
+    original_repo_id INTEGER REFERENCES repositories(blockchain_id),
+    reporter_address VARCHAR(42) NOT NULL,
+    violating_url TEXT NOT NULL,
+    evidence_hash VARCHAR(64) NOT NULL,
+    similarity_score INTEGER CHECK (similarity_score >= 0 AND similarity_score <= 100),
+    status VARCHAR(20) DEFAULT 'pending',
+    reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    dmca_reference TEXT,
+    metadata JSONB
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id UUID PRIMARY KEY,
+    job_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    data JSONB,
+    result JSONB,
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for better performance
+CREATE INDEX idx_repositories_owner ON repositories(owner_address);
+CREATE INDEX idx_repositories_hash ON repositories(repo_hash);
+CREATE INDEX idx_violations_repo ON violations(original_repo_id);
+CREATE INDEX idx_violations_status ON violations(status);
+CREATE INDEX idx_jobs_status ON jobs(status);
+CREATE INDEX idx_jobs_type ON jobs(job_type);
+
+---
+# k8s-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-protection-agent
+  labels:
+    app: github-protection-agent
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: github-protection-agent
+  template:
+    metadata:
+      labels:
+        app: github-protection-agent
+    spec:
+      containers:
+      - name: agent-api
+        image: github-protection-agent:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: anthropic-api-key
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: github-token
+        - name: PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: blockchain-secrets
+              key: private-key
+        - name: CONTRACT_ADDRESS
+          value: "0x1234567890123456789012345678901234567890"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /agent-status
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-protection-service
+spec:
+  selector:
+    app: github-protection-agent
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-secrets
+type: Opaque
+stringData:
+  anthropic-api-key: "your_anthropic_api_key_here"
+  github-token: "your_github_token_here"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: blockchain-secrets
+type: Opaque
+stringData:
+  private-key: "your_private_key_here"
