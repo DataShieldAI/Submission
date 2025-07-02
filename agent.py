@@ -7,88 +7,82 @@ import time
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
-
-# LangChain imports
-from langchain.agents import initialize_agent, AgentType
-from langchain.tools import BaseTool, StructuredTool
-from langchain.schema import BaseMessage
-from langchain.chat_models import ChatAnthropic
-from langchain.memory import ConversationBufferMemory
-from langchain.callbacks import get_openai_callback
-
-# LlamaIndex imports
-from llama_index.core import Document, VectorStoreIndex, ServiceContext
-from llama_index.core.node_parser import SimpleNodeParser
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.retrievers import VectorIndexRetriever
-
-# Web3 and Flow imports
-from viem import createWalletClient, http, createPublicClient
-import viem
-from viem.account import Account
-
-# PDF generation
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-
-# GitHub API
-import git
 import tempfile
 import shutil
 
-class GitHubProtectionAgent:
+# LangChain imports with OpenAI
+from langchain.agents import initialize_agent, AgentType
+from langchain.tools import BaseTool, StructuredTool
+from langchain.schema import BaseMessage
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+
+# LlamaIndex imports (simplified)
+from llama_index.core import Document, VectorStoreIndex, Settings
+from llama_index.core.node_parser import SimpleNodeParser
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.openai import OpenAI as LlamaOpenAI
+from llama_index.llms.ollama import Ollama
+
+# Web3 and Flow imports (simplified)
+import requests as web3_requests
+
+# GitHub API
+import subprocess
+
+class SimpleGitHubProtectionAgent:
     def __init__(self, config: Dict):
         self.config = config
-        self.setup_clients()
         self.setup_models()
         self.setup_tools()
         self.setup_agent()
         
-    def setup_clients(self):
-        """Initialize blockchain and API clients"""
-        # Flow EVM client setup
-        self.public_client = createPublicClient({
-            'transport': http('https://testnet.evm.nodes.onflow.org'),
-            'chain': {
-                'id': 545,
-                'name': 'Flow Testnet'
-            }
-        })
-        
-        # Wallet client for transactions
-        self.wallet_client = createWalletClient({
-            'transport': http('https://testnet.evm.nodes.onflow.org'),
-            'chain': {
-                'id': 545,
-                'name': 'Flow Testnet'
-            },
-            'account': Account.from_key(self.config['PRIVATE_KEY'])
-        })
-        
-        # GitHub API setup
-        self.github_headers = {
-            'Authorization': f"token {self.config['GITHUB_TOKEN']}",
-            'Accept': 'application/vnd.github.v3+json'
-        }
+        # Simple in-memory storage instead of database
+        self.repositories = {}
+        self.violations = {}
+        self.jobs = {}
         
     def setup_models(self):
-        """Initialize AI models and embeddings"""
-        self.llm = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
-            api_key=self.config['ANTHROPIC_API_KEY']
-        )
+        """Initialize AI models"""
         
-        # Setup LlamaIndex for code analysis
-        self.embed_model = HuggingFaceEmbedding(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        # Choose between OpenAI or Ollama
+        use_ollama = self.config.get('USE_OLLAMA', False)
         
-        self.service_context = ServiceContext.from_defaults(
-            embed_model=self.embed_model,
-            llm=self.llm
-        )
+        if use_ollama:
+            print("🦙 Using Ollama (free local model)")
+            # LangChain with Ollama
+            self.llm = ChatOpenAI(
+                base_url="http://localhost:11434/v1",
+                api_key="ollama",  # Required but ignored
+                model="llama3.2:3b"  # You can change this model
+            )
+            
+            # LlamaIndex with Ollama
+            Settings.llm = Ollama(model="llama3.2:3b", base_url="http://localhost:11434")
+            
+        else:
+            print("🤖 Using OpenAI")
+            # LangChain with OpenAI
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",  # Cheaper model
+                api_key=self.config['OPENAI_API_KEY']
+            )
+            
+            # LlamaIndex with OpenAI
+            Settings.llm = LlamaOpenAI(
+                model="gpt-4o-mini",
+                api_key=self.config['OPENAI_API_KEY']
+            )
+        
+        # Setup embeddings (free option)
+        try:
+            Settings.embed_model = HuggingFaceEmbedding(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            print("✅ Using free HuggingFace embeddings")
+        except Exception as e:
+            print(f"⚠️ Embeddings setup failed: {e}")
+            print("💡 Install: pip install sentence-transformers")
         
     def setup_tools(self):
         """Initialize agent tools"""
@@ -122,11 +116,6 @@ class GitHubProtectionAgent:
                 func=self.report_violation,
                 name="report_violation",
                 description="Report a code violation to the blockchain"
-            ),
-            StructuredTool.from_function(
-                func=self.generate_dmca,
-                name="generate_dmca",
-                description="Generate DMCA takedown notice"
             )
         ]
         
@@ -140,123 +129,128 @@ class GitHubProtectionAgent:
             agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True,
             memory=self.memory,
-            max_iterations=10
+            max_iterations=5  # Reduced for faster responses
         )
         
     def analyze_repository(self, github_url: str) -> Dict:
-        """Analyze repository and extract key features"""
+        """Analyze repository and extract key features (simplified)"""
         try:
-            # Clone repository to temporary directory
-            with tempfile.TemporaryDirectory() as temp_dir:
-                repo = git.Repo.clone_from(github_url, temp_dir)
-                
-                # Extract code files
-                code_files = []
-                for root, dirs, files in os.walk(temp_dir):
-                    # Skip .git directory
-                    dirs[:] = [d for d in dirs if d != '.git']
-                    
-                    for file in files:
-                        if file.endswith(('.py', '.js', '.java', '.cpp', '.c', '.go', '.rs', '.sol')):
-                            file_path = os.path.join(root, file)
-                            try:
-                                with open(file_path, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                    code_files.append({
-                                        'file': file,
-                                        'path': file_path.replace(temp_dir, ''),
-                                        'content': content[:5000]  # Limit content
-                                    })
-                            except Exception:
-                                continue
-                
-                # Create documents for LlamaIndex
-                documents = []
-                for code_file in code_files:
-                    doc = Document(
-                        text=code_file['content'],
-                        metadata={'file': code_file['file'], 'path': code_file['path']}
-                    )
-                    documents.append(doc)
-                
-                # Build index and query for key features
-                index = VectorStoreIndex.from_documents(
-                    documents, 
-                    service_context=self.service_context
-                )
-                
-                query_engine = index.as_query_engine()
-                
-                # Extract key features using AI
-                features_query = """
-                Identify the key unique features, algorithms, and distinctive code patterns 
-                in this repository. Focus on:
-                1. Unique algorithms or data structures
-                2. Novel implementations
-                3. Distinctive code patterns
-                4. Key function signatures
-                5. Architecture patterns
-                Return as a JSON list of strings.
-                """
-                
-                response = query_engine.query(features_query)
-                
-                # Generate repository hash
-                repo_content = "".join([f['content'] for f in code_files])
-                repo_hash = hashlib.sha256(repo_content.encode()).hexdigest()
-                
-                # Generate fingerprint using key features
-                fingerprint_data = {
-                    'total_files': len(code_files),
-                    'file_types': list(set([f['file'].split('.')[-1] for f in code_files])),
-                    'key_features': str(response),
-                    'repo_hash': repo_hash
-                }
-                
-                fingerprint = hashlib.sha256(
-                    json.dumps(fingerprint_data, sort_keys=True).encode()
-                ).hexdigest()
-                
-                return {
-                    'success': True,
-                    'repo_hash': repo_hash,
-                    'fingerprint': fingerprint,
-                    'key_features': str(response),
-                    'total_files': len(code_files),
-                    'analysis': fingerprint_data
-                }
-                
+            # Simple approach: download repo info via GitHub API
+            repo_parts = github_url.replace('https://github.com/', '').split('/')
+            if len(repo_parts) < 2:
+                return {'success': False, 'error': 'Invalid GitHub URL'}
+            
+            owner, repo = repo_parts[0], repo_parts[1]
+            
+            # Get repository info via GitHub API
+            headers = {}
+            if self.config.get('GITHUB_TOKEN'):
+                headers['Authorization'] = f"token {self.config['GITHUB_TOKEN']}"
+            
+            # Get repo details
+            repo_response = requests.get(
+                f"https://api.github.com/repos/{owner}/{repo}",
+                headers=headers
+            )
+            
+            if repo_response.status_code != 200:
+                return {'success': False, 'error': 'Repository not found or private'}
+            
+            repo_data = repo_response.json()
+            
+            # Get file list (first page)
+            contents_response = requests.get(
+                f"https://api.github.com/repos/{owner}/{repo}/contents",
+                headers=headers
+            )
+            
+            files = []
+            if contents_response.status_code == 200:
+                contents = contents_response.json()
+                files = [item['name'] for item in contents if item['type'] == 'file']
+            
+            # Simple fingerprinting based on repo metadata
+            fingerprint_data = {
+                'name': repo_data.get('name', ''),
+                'description': repo_data.get('description', ''),
+                'language': repo_data.get('language', ''),
+                'size': repo_data.get('size', 0),
+                'files': files[:10],  # First 10 files
+                'created_at': repo_data.get('created_at', ''),
+            }
+            
+            # Generate hash from repository data
+            repo_hash = hashlib.sha256(
+                json.dumps(fingerprint_data, sort_keys=True).encode()
+            ).hexdigest()
+            
+            # Generate fingerprint
+            fingerprint = hashlib.sha256(
+                f"{repo_data.get('full_name', '')}{repo_data.get('created_at', '')}".encode()
+            ).hexdigest()
+            
+            # Use AI to extract key features
+            features_prompt = f"""
+            Analyze this GitHub repository and identify key unique features:
+            Name: {repo_data.get('name', '')}
+            Description: {repo_data.get('description', '')}
+            Language: {repo_data.get('language', '')}
+            Files: {', '.join(files[:5])}
+            
+            List 3-5 distinctive features that make this repository unique.
+            """
+            
+            try:
+                response = self.llm.invoke(features_prompt)
+                key_features = response.content
+            except Exception as e:
+                key_features = f"Language: {repo_data.get('language', 'Unknown')}, Files: {len(files)}"
+            
+            return {
+                'success': True,
+                'repo_hash': repo_hash,
+                'fingerprint': fingerprint,
+                'key_features': key_features,
+                'total_files': len(files),
+                'analysis': fingerprint_data,
+                'repo_data': repo_data
+            }
+            
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
     def register_repository(self, github_url: str, license_type: str = "MIT") -> Dict:
-        """Register repository on blockchain"""
+        """Register repository on blockchain (simplified)"""
         try:
             # First analyze the repository
             analysis = self.analyze_repository(github_url)
             if not analysis['success']:
                 return analysis
             
-            # Prepare contract call
+            # Simulate blockchain transaction (replace with actual Web3 call)
             contract_address = self.config['CONTRACT_ADDRESS']
             
-            # Call registerRepository function
-            tx_hash = self.wallet_client.write_contract(
-                address=contract_address,
-                abi=self.get_contract_abi(),
-                function_name='registerRepository',
-                args=[
-                    github_url,
-                    analysis['repo_hash'],
-                    analysis['fingerprint'],
-                    analysis['key_features'].split('\n')[:10],  # Limit features
-                    license_type,
-                    ""  # IPFS metadata (to be implemented)
-                ]
-            )
+            # For now, just simulate the transaction
+            tx_hash = f"0x{hashlib.sha256(f'{github_url}{time.time()}'.encode()).hexdigest()}"
+            
+            # Store in memory (replace with actual blockchain call)
+            repo_id = len(self.repositories) + 1
+            self.repositories[repo_id] = {
+                'id': repo_id,
+                'github_url': github_url,
+                'repo_hash': analysis['repo_hash'],
+                'fingerprint': analysis['fingerprint'],
+                'key_features': analysis['key_features'],
+                'license_type': license_type,
+                'registered_at': datetime.now().isoformat(),
+                'tx_hash': tx_hash
+            }
+            
+            print(f"📝 Repository registered with ID: {repo_id}")
             
             return {
                 'success': True,
+                'repo_id': repo_id,
                 'tx_hash': tx_hash,
                 'repo_hash': analysis['repo_hash'],
                 'fingerprint': analysis['fingerprint']
@@ -265,21 +259,39 @@ class GitHubProtectionAgent:
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
-    def search_for_violations(self, repo_id: int, key_features: List[str]) -> List[Dict]:
-        """Search GitHub for potential code violations"""
+    def search_for_violations(self, repo_id: int, key_features: List[str] = None) -> List[Dict]:
+        """Search GitHub for potential code violations (simplified)"""
         violations = []
         
         try:
-            # Search GitHub using key features
-            for feature in key_features[:5]:  # Limit searches
-                search_query = f"{feature} language:python OR language:javascript"
+            if repo_id not in self.repositories:
+                return []
+            
+            repo = self.repositories[repo_id]
+            
+            # Use key features from registration if not provided
+            if not key_features:
+                key_features = repo['key_features'].split('\n')[:3]
+            
+            headers = {}
+            if self.config.get('GITHUB_TOKEN'):
+                headers['Authorization'] = f"token {self.config['GITHUB_TOKEN']}"
+            
+            # Search GitHub using repository name and language
+            search_terms = [
+                repo['github_url'].split('/')[-1],  # repo name
+                repo.get('language', 'python')
+            ]
+            
+            for term in search_terms[:2]:  # Limit searches to avoid rate limits
+                search_query = f"{term} in:name,description"
                 
                 response = requests.get(
-                    'https://api.github.com/search/code',
-                    headers=self.github_headers,
+                    'https://api.github.com/search/repositories',
+                    headers=headers,
                     params={
                         'q': search_query,
-                        'per_page': 10
+                        'per_page': 5
                     }
                 )
                 
@@ -287,26 +299,25 @@ class GitHubProtectionAgent:
                     results = response.json()
                     
                     for item in results.get('items', []):
-                        # Download and analyze the file
-                        file_response = requests.get(
-                            item['download_url'], 
-                            headers=self.github_headers
+                        # Skip if it's the same repository
+                        if item['html_url'] == repo['github_url']:
+                            continue
+                        
+                        # Simple similarity check (can be enhanced)
+                        similarity = self.calculate_simple_similarity(
+                            repo['github_url'], 
+                            item['html_url']
                         )
                         
-                        if file_response.status_code == 200:
-                            # Calculate similarity (simplified)
-                            similarity = self.calculate_similarity(
-                                feature, 
-                                file_response.text
-                            )
-                            
-                            if similarity > 0.7:  # 70% threshold
-                                violations.append({
-                                    'repo_url': item['repository']['html_url'],
-                                    'file_url': item['html_url'],
-                                    'similarity': similarity,
-                                    'feature_matched': feature
-                                })
+                        if similarity > 0.5:  # 50% threshold
+                            violations.append({
+                                'repo_url': item['html_url'],
+                                'similarity': similarity,
+                                'name': item['name'],
+                                'description': item.get('description', ''),
+                                'language': item.get('language', ''),
+                                'created_at': item.get('created_at', '')
+                            })
                 
                 time.sleep(1)  # Rate limiting
                 
@@ -315,17 +326,21 @@ class GitHubProtectionAgent:
             
         return violations
     
-    def calculate_similarity(self, feature: str, code: str) -> float:
-        """Calculate similarity between feature and code"""
-        # Simplified similarity calculation
-        feature_words = set(feature.lower().split())
-        code_words = set(code.lower().split())
+    def calculate_simple_similarity(self, original_url: str, candidate_url: str) -> float:
+        """Calculate simple similarity between repositories"""
+        # Very basic similarity - can be enhanced with more sophisticated algorithms
+        original_name = original_url.split('/')[-1].lower()
+        candidate_name = candidate_url.split('/')[-1].lower()
         
-        if not feature_words:
-            return 0.0
-            
-        intersection = feature_words.intersection(code_words)
-        return len(intersection) / len(feature_words)
+        # Check for exact name match
+        if original_name == candidate_name:
+            return 0.9
+        
+        # Check for similar names
+        common_chars = set(original_name) & set(candidate_name)
+        similarity = len(common_chars) / max(len(original_name), len(candidate_name))
+        
+        return similarity
     
     def generate_license(self, repo_type: str, usage_requirements: str) -> str:
         """Generate appropriate license based on repository analysis"""
@@ -336,45 +351,45 @@ class GitHubProtectionAgent:
         Consider:
         - Commercial use restrictions if needed
         - Attribution requirements
-        - Copyleft vs permissive licensing
-        - AI training restrictions
+        - AI training restrictions if requested
         
-        Provide the full license text.
+        Provide a concise license recommendation and key points.
         """
         
-        response = self.llm.invoke(prompt)
-        return response.content
+        try:
+            response = self.llm.invoke(prompt)
+            return response.content
+        except Exception as e:
+            return f"Error generating license: {e}"
     
     def security_audit(self, github_url: str) -> Dict:
-        """Perform security audit on repository"""
+        """Perform security audit on repository (simplified)"""
         try:
             analysis = self.analyze_repository(github_url)
             if not analysis['success']:
                 return analysis
                 
             audit_prompt = f"""
-            Perform a security audit on this code repository.
+            Perform a basic security audit on this repository:
             
-            Key features: {analysis['key_features']}
+            Name: {analysis['analysis'].get('name', '')}
+            Language: {analysis['analysis'].get('language', '')}
+            Description: {analysis['analysis'].get('description', '')}
+            Files: {', '.join(analysis['analysis'].get('files', []))}
             
-            Check for:
-            1. Common security vulnerabilities
-            2. Hardcoded secrets or keys
-            3. Input validation issues
-            4. Authentication/authorization flaws
-            5. Dependency vulnerabilities
-            
-            Provide a JSON response with:
-            - severity: high/medium/low
-            - issues: list of security issues found
-            - recommendations: list of fixes
+            Identify potential security concerns and recommendations.
+            Focus on common vulnerabilities for {analysis['analysis'].get('language', 'this')} projects.
             """
             
-            response = self.llm.invoke(audit_prompt)
+            try:
+                response = self.llm.invoke(audit_prompt)
+                audit_result = response.content
+            except Exception as e:
+                audit_result = f"Audit failed: {e}"
             
             return {
                 'success': True,
-                'audit_result': response.content,
+                'audit_result': audit_result,
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -382,10 +397,8 @@ class GitHubProtectionAgent:
             return {'success': False, 'error': str(e)}
     
     def report_violation(self, original_repo_id: int, violating_url: str, similarity_score: float) -> Dict:
-        """Report violation to blockchain"""
+        """Report violation (simplified - stores in memory)"""
         try:
-            contract_address = self.config['CONTRACT_ADDRESS']
-            
             # Generate evidence hash
             evidence = {
                 'violating_url': violating_url,
@@ -396,21 +409,27 @@ class GitHubProtectionAgent:
                 json.dumps(evidence, sort_keys=True).encode()
             ).hexdigest()
             
-            # Call reportViolation function
-            tx_hash = self.wallet_client.write_contract(
-                address=contract_address,
-                abi=self.get_contract_abi(),
-                function_name='reportViolation',
-                args=[
-                    original_repo_id,
-                    violating_url,
-                    evidence_hash,
-                    int(similarity_score * 100)  # Convert to integer percentage
-                ]
-            )
+            # Simulate blockchain transaction
+            tx_hash = f"0x{hashlib.sha256(f'{violating_url}{time.time()}'.encode()).hexdigest()}"
+            
+            # Store violation
+            violation_id = len(self.violations) + 1
+            self.violations[violation_id] = {
+                'id': violation_id,
+                'original_repo_id': original_repo_id,
+                'violating_url': violating_url,
+                'similarity_score': similarity_score,
+                'evidence_hash': evidence_hash,
+                'tx_hash': tx_hash,
+                'reported_at': datetime.now().isoformat(),
+                'status': 'pending'
+            }
+            
+            print(f"⚠️ Violation reported with ID: {violation_id}")
             
             return {
                 'success': True,
+                'violation_id': violation_id,
                 'tx_hash': tx_hash,
                 'evidence_hash': evidence_hash
             }
@@ -419,81 +438,28 @@ class GitHubProtectionAgent:
             return {'success': False, 'error': str(e)}
     
     def generate_dmca(self, violation_data: Dict) -> str:
-        """Generate DMCA takedown notice"""
+        """Generate DMCA takedown notice (simplified)"""
         try:
-            doc = SimpleDocTemplate(
-                f"dmca_notice_{int(time.time())}.pdf",
-                pagesize=letter
-            )
+            dmca_prompt = f"""
+            Generate a professional DMCA takedown notice for the following violation:
             
-            styles = getSampleStyleSheet()
-            story = []
-            
-            # DMCA Notice content
-            title = Paragraph("DMCA Takedown Notice", styles['Title'])
-            story.append(title)
-            story.append(Spacer(1, 12))
-            
-            content = f"""
-            To Whom It May Concern:
-            
-            This is a formal DMCA takedown notice for copyrighted code found at:
-            {violation_data['violating_url']}
-            
-            Original Repository: {violation_data.get('original_repo', 'N/A')}
-            Similarity Score: {violation_data.get('similarity_score', 0):.2f}%
-            
-            The infringing content violates copyright protections and should be removed.
-            
+            Violating URL: {violation_data['violating_url']}
+            Similarity Score: {violation_data.get('similarity_score', 0):.2f}
             Evidence Hash: {violation_data.get('evidence_hash', 'N/A')}
-            Blockchain Transaction: {violation_data.get('tx_hash', 'N/A')}
             
-            Contact Information:
-            Generated by GitHub Protection Agent
-            Timestamp: {datetime.now().isoformat()}
-            
-            This notice is generated automatically based on code similarity analysis.
+            Include:
+            - Formal legal language
+            - Clear identification of copyrighted work
+            - Description of infringement
+            - Request for removal
+            - Contact information placeholder
             """
             
-            body = Paragraph(content, styles['Normal'])
-            story.append(body)
-            
-            doc.build(story)
-            
-            return f"DMCA notice generated successfully for {violation_data['violating_url']}"
+            response = self.llm.invoke(dmca_prompt)
+            return response.content
             
         except Exception as e:
             return f"Error generating DMCA: {str(e)}"
-    
-    def get_contract_abi(self) -> List[Dict]:
-        """Return contract ABI"""
-        # Simplified ABI - in production, load from file
-        return [
-            {
-                "inputs": [
-                    {"type": "string", "name": "githubUrl"},
-                    {"type": "string", "name": "repoHash"},
-                    {"type": "string", "name": "codeFingerprint"},
-                    {"type": "string[]", "name": "keyFeatures"},
-                    {"type": "string", "name": "licenseType"},
-                    {"type": "string", "name": "ipfsMetadata"}
-                ],
-                "name": "registerRepository",
-                "outputs": [{"type": "uint256"}],
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {"type": "uint256", "name": "originalRepoId"},
-                    {"type": "string", "name": "violatingUrl"},
-                    {"type": "string", "name": "evidenceHash"},
-                    {"type": "uint256", "name": "similarityScore"}
-                ],
-                "name": "reportViolation",
-                "outputs": [{"type": "uint256"}],
-                "type": "function"
-            }
-        ]
     
     def run_protection_workflow(self, github_url: str) -> Dict:
         """Run complete protection workflow"""
@@ -514,7 +480,7 @@ class GitHubProtectionAgent:
             results['audit'] = audit
             
             # Step 3: Register repository
-            print("📝 Registering repository on blockchain...")
+            print("📝 Registering repository...")
             registration = self.register_repository(github_url)
             results['registration'] = registration
             
@@ -523,10 +489,7 @@ class GitHubProtectionAgent:
                 
             # Step 4: Search for violations
             print("🔎 Searching for potential violations...")
-            violations = self.search_for_violations(
-                1,  # Assuming repo ID 1 for demo
-                analysis['key_features'].split('\n')[:5]
-            )
+            violations = self.search_for_violations(registration['repo_id'])
             results['violations'] = violations
             
             # Step 5: Report violations if found
@@ -535,9 +498,9 @@ class GitHubProtectionAgent:
                 violation_reports = []
                 
                 for violation in violations:
-                    if violation['similarity'] > 0.8:  # High similarity threshold
+                    if violation['similarity'] > 0.7:  # High similarity threshold
                         report = self.report_violation(
-                            1,  # Repo ID
+                            registration['repo_id'],
                             violation['repo_url'],
                             violation['similarity']
                         )
@@ -554,6 +517,8 @@ class GitHubProtectionAgent:
                             report['dmca'] = dmca
                 
                 results['violation_reports'] = violation_reports
+            else:
+                print("✅ No potential violations found")
             
             return results
             
@@ -561,25 +526,39 @@ class GitHubProtectionAgent:
             results['error'] = str(e)
             return results
 
-# Main execution
-async def main():
+# Simple test function
+def main():
     config = {
-        'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY'),
+        'USE_OLLAMA': os.getenv('USE_OLLAMA', 'false').lower() == 'true',
+        'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
         'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN'),
-        'PRIVATE_KEY': os.getenv('PRIVATE_KEY'),
-        'CONTRACT_ADDRESS': os.getenv('CONTRACT_ADDRESS')
+        'CONTRACT_ADDRESS': os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50')
     }
     
-    agent = GitHubProtectionAgent(config)
+    # Check requirements
+    if not config['USE_OLLAMA'] and not config['OPENAI_API_KEY']:
+        print("❌ Please set OPENAI_API_KEY or USE_OLLAMA=true")
+        return
     
-    # Example usage
-    github_url = "https://github.com/example/repo"
+    agent = SimpleGitHubProtectionAgent(config)
     
-    print("🚀 Starting GitHub Protection Agent...")
-    results = agent.run_protection_workflow(github_url)
+    print("🚀 GitHub Protection Agent initialized!")
+    print("💬 You can now interact with the agent")
     
-    print("\n📊 Results:")
-    print(json.dumps(results, indent=2, default=str))
+    # Interactive mode
+    while True:
+        try:
+            user_input = input("\n💬 Ask me anything (or 'quit' to exit): ")
+            if user_input.lower() in ['quit', 'exit']:
+                break
+                
+            response = agent.agent.run(user_input)
+            print(f"\n🤖 Agent: {response}")
+            
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
