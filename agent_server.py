@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional, Dict, Any
 import asyncio
@@ -9,17 +10,17 @@ import uuid
 from datetime import datetime
 import logging
 
-# Import our simplified agent
-from simplified_agent import SimpleGitHubProtectionAgent
+# Import our enhanced agent
+from enhanced_agent_with_security import EnhancedGitHubProtectionAgent
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="GitHub Repository Protection API (Simplified)",
-    description="AI-powered GitHub repository protection with blockchain integration - No database required!",
-    version="1.0.0"
+    title="Enhanced GitHub Repository Protection API",
+    description="AI-powered GitHub repository protection with comprehensive security auditing and blockchain integration",
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -34,11 +35,20 @@ app.add_middleware(
 # Global agent instance
 agent = None
 
-# Pydantic models
+# Enhanced Pydantic models
 class RepositoryRegistration(BaseModel):
     github_url: HttpUrl
     license_type: str = "MIT"
     description: Optional[str] = None
+
+class SecurityAuditRequest(BaseModel):
+    github_url: HttpUrl
+    audit_type: str = "comprehensive"
+    include_private_keys: bool = True
+    include_vulnerabilities: bool = True
+
+class URLCleaningRequest(BaseModel):
+    url_text: str
 
 class ViolationReport(BaseModel):
     original_repo_id: int
@@ -46,54 +56,47 @@ class ViolationReport(BaseModel):
     similarity_score: float
     evidence_description: Optional[str] = None
 
-class SecurityAuditRequest(BaseModel):
-    github_url: HttpUrl
-    audit_type: str = "comprehensive"
-
 class AgentQueryRequest(BaseModel):
     query: str
     context: Optional[Dict[str, Any]] = None
 
-class JobResponse(BaseModel):
-    job_id: str
-    status: str
-    message: str
-    created_at: str
-
-class AnalysisResult(BaseModel):
+class SecurityAuditResult(BaseModel):
     success: bool
-    repo_hash: Optional[str] = None
-    fingerprint: Optional[str] = None
-    key_features: Optional[str] = None
-    total_files: Optional[int] = None
+    audit_id: Optional[int] = None
+    files_scanned: Optional[int] = None
+    total_findings: Optional[int] = None
+    critical_findings: Optional[int] = None
+    high_findings: Optional[int] = None
+    medium_findings: Optional[int] = None
+    ai_summary: Optional[str] = None
     error: Optional[str] = None
 
-# In-memory job tracking (no database needed)
+# In-memory job tracking
 jobs = {}
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the agent on startup"""
+    """Initialize the enhanced agent on startup"""
     global agent
     
     config = {
-        'USE_OLLAMA': os.getenv('USE_OLLAMA', 'false').lower() == 'true',
+        'USE_LOCAL_MODEL': os.getenv('USE_LOCAL_MODEL', 'false').lower() == 'true',
         'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
         'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN'),
         'CONTRACT_ADDRESS': os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50')
     }
     
     # Check requirements
-    if not config['USE_OLLAMA'] and not config['OPENAI_API_KEY']:
-        logger.error("Missing OPENAI_API_KEY and USE_OLLAMA not set to true")
-        raise RuntimeError("Please set OPENAI_API_KEY or USE_OLLAMA=true")
+    if not config['USE_LOCAL_MODEL'] and not config['OPENAI_API_KEY']:
+        logger.error("Missing OPENAI_API_KEY and USE_LOCAL_MODEL not set to true")
+        raise RuntimeError("Please set OPENAI_API_KEY or USE_LOCAL_MODEL=true")
     
     try:
-        agent = SimpleGitHubProtectionAgent(config)
-        logger.info("✅ GitHub Protection Agent initialized successfully")
+        agent = EnhancedGitHubProtectionAgent(config)
+        logger.info("✅ Enhanced GitHub Protection Agent initialized successfully")
         
-        if config['USE_OLLAMA']:
-            logger.info("🦙 Using Ollama (free local model)")
+        if config['USE_LOCAL_MODEL']:
+            logger.info("🦙 Using local model")
         else:
             logger.info("🤖 Using OpenAI GPT-4o-mini")
             
@@ -101,61 +104,97 @@ async def startup_event():
         logger.error(f"Failed to initialize agent: {e}")
         raise
 
-def create_job(job_type: str, data: Dict) -> str:
-    """Create a new background job"""
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {
-        'id': job_id,
-        'type': job_type,
-        'status': 'pending',
-        'data': data,
-        'result': None,
-        'error': None,
-        'created_at': datetime.now().isoformat(),
-        'updated_at': datetime.now().isoformat()
-    }
-    return job_id
-
-def update_job(job_id: str, status: str, result: Any = None, error: str = None):
-    """Update job status"""
-    if job_id in jobs:
-        jobs[job_id].update({
-            'status': status,
-            'result': result,
-            'error': error,
-            'updated_at': datetime.now().isoformat()
-        })
-
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    ollama_status = "✅ Connected" if os.getenv('USE_OLLAMA') == 'true' else "❌ Not using Ollama"
+    """Enhanced health check endpoint"""
+    ai_backend = "Local Model" if os.getenv('USE_LOCAL_MODEL') == 'true' else "OpenAI"
     openai_status = "✅ Available" if os.getenv('OPENAI_API_KEY') else "❌ No API key"
     
     return {
-        "service": "GitHub Repository Protection API (Simplified)",
-        "version": "1.0.0",
+        "service": "Enhanced GitHub Repository Protection API",
+        "version": "2.0.0",
         "status": "healthy",
         "agent_ready": agent is not None,
         "contract_address": os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50'),
         "ai_backend": {
-            "ollama": ollama_status,
-            "openai": openai_status
+            "current": ai_backend,
+            "openai": openai_status,
+            "local_model": "✅ Enabled" if os.getenv('USE_LOCAL_MODEL') == 'true' else "❌ Disabled"
         },
         "database": "In-memory (no setup required)",
-        "features": [
+        "enhanced_features": [
+            "Comprehensive security auditing",
+            "Private key leak detection",
+            "Vulnerability scanning",
+            "URL cleaning and standardization",
             "Repository analysis and fingerprinting",
-            "AI-powered security auditing",
-            "GitHub violation detection",
+            "AI-powered violation detection",
             "Natural language agent interface",
-            "Flow blockchain integration",
-            "Zero database setup"
+            "Flow blockchain integration"
         ]
     }
 
+@app.post("/clean-urls")
+async def clean_github_urls(request: URLCleaningRequest) -> Dict:
+    """Clean and standardize GitHub URLs from text input"""
+    if not agent:
+        raise HTTPException(status_code=503, detail="Agent not initialized")
+    
+    try:
+        logger.info("Cleaning GitHub URLs from text input")
+        result = agent.clean_github_urls(request.url_text)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"URL cleaning failed: {e}")
+        raise HTTPException(status_code=500, detail=f"URL cleaning failed: {str(e)}")
+
+@app.post("/security-audit")
+async def comprehensive_security_audit(request: SecurityAuditRequest) -> SecurityAuditResult:
+    """Perform comprehensive security audit including private key detection"""
+    if not agent:
+        raise HTTPException(status_code=503, detail="Agent not initialized")
+    
+    try:
+        logger.info(f"Starting comprehensive security audit: {request.github_url}")
+        result = agent.comprehensive_security_audit(str(request.github_url))
+        
+        return SecurityAuditResult(**result)
+        
+    except Exception as e:
+        logger.error(f"Security audit failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Security audit failed: {str(e)}")
+
+@app.get("/security-audit/{audit_id}")
+async def get_security_audit(audit_id: int) -> Dict:
+    """Get detailed security audit results"""
+    if not agent:
+        raise HTTPException(status_code=503, detail="Agent not initialized")
+    
+    if audit_id not in agent.security_audits:
+        raise HTTPException(status_code=404, detail="Security audit not found")
+    
+    return {
+        "success": True,
+        "audit": agent.security_audits[audit_id]
+    }
+
+@app.get("/security-audits")
+async def list_security_audits() -> Dict:
+    """List all security audits"""
+    if not agent:
+        raise HTTPException(status_code=503, detail="Agent not initialized")
+    
+    return {
+        "success": True,
+        "total_audits": len(agent.security_audits),
+        "audits": list(agent.security_audits.values())
+    }
+
 @app.post("/analyze-repository")
-async def analyze_repository(request: RepositoryRegistration) -> AnalysisResult:
-    """Analyze a GitHub repository"""
+async def analyze_repository(request: RepositoryRegistration) -> Dict:
+    """Analyze a GitHub repository for key features"""
     if not agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
@@ -163,7 +202,7 @@ async def analyze_repository(request: RepositoryRegistration) -> AnalysisResult:
         logger.info(f"Analyzing repository: {request.github_url}")
         result = agent.analyze_repository(str(request.github_url))
         
-        return AnalysisResult(**result)
+        return result
         
     except Exception as e:
         logger.error(f"Repository analysis failed: {e}")
@@ -188,20 +227,24 @@ async def register_repository(request: RepositoryRegistration) -> Dict:
         logger.error(f"Repository registration failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/security-audit")
-async def security_audit(request: SecurityAuditRequest) -> Dict:
-    """Perform security audit on repository"""
+@app.post("/full-protection-workflow")
+async def full_protection_workflow(request: RepositoryRegistration) -> Dict:
+    """Run complete protection workflow with enhanced security audit"""
     if not agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
     try:
-        logger.info(f"Starting security audit: {request.github_url}")
-        result = agent.security_audit(str(request.github_url))
+        logger.info(f"Starting enhanced protection workflow: {request.github_url}")
+        result = agent.run_protection_workflow(str(request.github_url))
         
-        return result
+        return {
+            "success": True,
+            "workflow_result": result,
+            "message": "Enhanced protection workflow completed with security audit"
+        }
         
     except Exception as e:
-        logger.error(f"Security audit failed: {e}")
+        logger.error(f"Enhanced protection workflow failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/search-violations/{repo_id}")
@@ -255,26 +298,6 @@ async def report_violation(request: ViolationReport) -> Dict:
         logger.error(f"Violation reporting failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/full-protection-workflow")
-async def full_protection_workflow(request: RepositoryRegistration) -> Dict:
-    """Run complete protection workflow"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    try:
-        logger.info(f"Starting full protection workflow: {request.github_url}")
-        result = agent.run_protection_workflow(str(request.github_url))
-        
-        return {
-            "success": True,
-            "workflow_result": result,
-            "message": "Protection workflow completed"
-        }
-        
-    except Exception as e:
-        logger.error(f"Full protection workflow failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/agent-query")
 async def agent_query(request: AgentQueryRequest) -> Dict:
     """Query the agent with natural language"""
@@ -284,8 +307,26 @@ async def agent_query(request: AgentQueryRequest) -> Dict:
     try:
         logger.info(f"Agent query: {request.query}")
         
-        # Use the agent's LangChain agent to process the query
-        response = agent.agent.run(request.query)
+        # Add enhanced context
+        enhanced_query = f"""
+        You are an Enhanced GitHub Repository Protection Agent with comprehensive security auditing capabilities. 
+        Help the user with:
+        - Repository analysis and protection
+        - Comprehensive security auditing (private keys, vulnerabilities)
+        - License generation and compliance
+        - Violation detection and DMCA notices
+        - URL cleaning and standardization
+        
+        User query: {request.query}
+        
+        Current system status:
+        - Repositories tracked: {len(agent.repositories)}
+        - Violations found: {len(agent.violations)}
+        - Security audits completed: {len(agent.security_audits)}
+        - AI Backend: {'Local Model' if os.getenv('USE_LOCAL_MODEL') == 'true' else 'OpenAI'}
+        """
+        
+        response = agent.agent.run(enhanced_query)
         
         return {
             "success": True,
@@ -322,61 +363,55 @@ async def list_violations() -> Dict:
         "violations": list(agent.violations.values())
     }
 
-@app.get("/repository/{repo_id}")
-async def get_repository(repo_id: int) -> Dict:
-    """Get repository details"""
+@app.get("/stats")
+async def get_enhanced_stats() -> Dict:
+    """Get enhanced system statistics"""
     if not agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
-    if repo_id not in agent.repositories:
-        raise HTTPException(status_code=404, detail="Repository not found")
+    total_repos = len(agent.repositories)
+    total_violations = len(agent.violations)
+    total_audits = len(agent.security_audits)
+    
+    # Calculate security metrics
+    critical_findings = 0
+    high_findings = 0
+    total_findings = 0
+    
+    for audit in agent.security_audits.values():
+        if 'findings' in audit:
+            findings = audit['findings']
+            total_findings += len(findings)
+            critical_findings += len([f for f in findings if f.get('severity') == 'critical'])
+            high_findings += len([f for f in findings if f.get('severity') == 'high'])
     
     return {
         "success": True,
-        "repository": agent.repositories[repo_id]
-    }
-
-@app.get("/violation/{violation_id}")
-async def get_violation(violation_id: int) -> Dict:
-    """Get violation details"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    if violation_id not in agent.violations:
-        raise HTTPException(status_code=404, detail="Violation not found")
-    
-    return {
-        "success": True,
-        "violation": agent.violations[violation_id]
-    }
-
-@app.post("/generate-dmca/{violation_id}")
-async def generate_dmca_notice(violation_id: int) -> Dict:
-    """Generate DMCA notice for a specific violation"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    if violation_id not in agent.violations:
-        raise HTTPException(status_code=404, detail="Violation not found")
-    
-    try:
-        violation = agent.violations[violation_id]
-        dmca_notice = agent.generate_dmca(violation)
-        
-        return {
-            "success": True,
-            "violation_id": violation_id,
-            "dmca_notice": dmca_notice,
-            "generated_at": datetime.now().isoformat()
+        "statistics": {
+            "repositories": {
+                "total_tracked": total_repos,
+                "total_violations": total_violations,
+                "protection_rate": f"{(total_repos / (total_repos + total_violations) * 100):.1f}%" if total_repos > 0 else "0%"
+            },
+            "security_audits": {
+                "total_completed": total_audits,
+                "total_findings": total_findings,
+                "critical_findings": critical_findings,
+                "high_findings": high_findings,
+                "security_score": f"{max(0, 100 - (critical_findings * 10 + high_findings * 5)):.1f}%"
+            }
+        },
+        "system_info": {
+            "ai_backend": "Local Model" if os.getenv('USE_LOCAL_MODEL') == 'true' else "OpenAI",
+            "database": "In-memory",
+            "blockchain": "Flow Testnet",
+            "enhanced_features": "Security Auditing Enabled"
         }
-        
-    except Exception as e:
-        logger.error(f"DMCA generation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    }
 
 @app.get("/agent-status")
 async def get_agent_status() -> Dict:
-    """Get agent status and capabilities"""
+    """Get enhanced agent status and capabilities"""
     if not agent:
         return {"status": "not_initialized", "capabilities": []}
     
@@ -385,8 +420,11 @@ async def get_agent_status() -> Dict:
         "capabilities": [
             "repository_analysis",
             "code_fingerprinting", 
+            "comprehensive_security_auditing",
+            "private_key_leak_detection",
+            "vulnerability_scanning",
             "violation_detection",
-            "security_auditing",
+            "url_cleaning_and_standardization",
             "license_generation",
             "dmca_generation",
             "natural_language_interface"
@@ -395,124 +433,55 @@ async def get_agent_status() -> Dict:
         "memory_initialized": agent.memory is not None,
         "repositories_registered": len(agent.repositories),
         "violations_tracked": len(agent.violations),
-        "ai_backend": "Ollama" if os.getenv('USE_OLLAMA') == 'true' else "OpenAI",
+        "security_audits_completed": len(agent.security_audits),
+        "ai_backend": "Local Model" if os.getenv('USE_LOCAL_MODEL') == 'true' else "OpenAI",
         "contract_address": os.getenv('CONTRACT_ADDRESS'),
-        "database": "In-memory (no external database required)"
-    }
-
-@app.get("/stats")
-async def get_stats() -> Dict:
-    """Get system statistics"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    total_repos = len(agent.repositories)
-    total_violations = len(agent.violations)
-    
-    # Calculate some basic stats
-    pending_violations = sum(1 for v in agent.violations.values() if v.get('status') == 'pending')
-    
-    return {
-        "success": True,
-        "statistics": {
-            "total_repositories": total_repos,
-            "total_violations": total_violations,
-            "pending_violations": pending_violations,
-            "resolved_violations": total_violations - pending_violations,
-            "protection_rate": f"{(total_repos / (total_repos + total_violations) * 100):.1f}%" if total_repos > 0 else "0%"
-        },
-        "system_info": {
-            "ai_backend": "Ollama (Local)" if os.getenv('USE_OLLAMA') == 'true' else "OpenAI",
-            "database": "In-memory",
-            "blockchain": "Flow Testnet"
+        "database": "In-memory (no external database required)",
+        "enhanced_features": {
+            "security_scanner": "✅ Active",
+            "private_key_detection": "✅ Active",
+            "vulnerability_scanning": "✅ Active",
+            "url_cleaning": "✅ Active"
         }
     }
-
-@app.delete("/repository/{repo_id}")
-async def delete_repository(repo_id: int) -> Dict:
-    """Delete a repository (remove from tracking)"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    if repo_id not in agent.repositories:
-        raise HTTPException(status_code=404, detail="Repository not found")
-    
-    repo = agent.repositories.pop(repo_id)
-    
-    return {
-        "success": True,
-        "message": f"Repository {repo['github_url']} removed from tracking",
-        "deleted_repo": repo
-    }
-
-@app.post("/chat")
-async def chat_with_agent(request: AgentQueryRequest) -> Dict:
-    """Interactive chat interface with the agent"""
-    if not agent:
-        raise HTTPException(status_code=503, detail="Agent not initialized")
-    
-    try:
-        # Add some context to make responses more helpful
-        enhanced_query = f"""
-        You are a GitHub Repository Protection Agent. Help the user with:
-        - Repository analysis and protection
-        - Security auditing
-        - License generation
-        - Violation detection and DMCA notices
-        
-        User query: {request.query}
-        
-        Current system status:
-        - Repositories tracked: {len(agent.repositories)}
-        - Violations found: {len(agent.violations)}
-        - AI Backend: {'Ollama (Local)' if os.getenv('USE_OLLAMA') == 'true' else 'OpenAI'}
-        """
-        
-        response = agent.agent.run(enhanced_query)
-        
-        return {
-            "success": True,
-            "response": response,
-            "timestamp": datetime.now().isoformat(),
-            "conversation_context": {
-                "repositories_tracked": len(agent.repositories),
-                "violations_found": len(agent.violations)
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Chat failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Error handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     logger.error(f"Global exception: {exc}")
-    return {
-        "error": "Internal server error",
-        "message": str(exc),
-        "timestamp": datetime.now().isoformat()
-    }
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "message": str(exc),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
 
-# Startup message
+# Enhanced startup message
 @app.on_event("startup")
 async def startup_message():
-    print("\n" + "="*60)
-    print("🛡️  GitHub Repository Protection Agent")
-    print("="*60)
+    print("\n" + "="*70)
+    print("🛡️  Enhanced GitHub Repository Protection Agent")
+    print("="*70)
     print("✅ FastAPI Server Started")
-    print(f"🤖 AI Backend: {'Ollama (Free)' if os.getenv('USE_OLLAMA') == 'true' else 'OpenAI'}")
+    print(f"🤖 AI Backend: {'Local Model' if os.getenv('USE_LOCAL_MODEL') == 'true' else 'OpenAI'}")
     print("💾 Database: In-memory (no setup required)")
     print("🔗 Blockchain: Flow Testnet")
     print(f"📡 Contract: {os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50')}")
+    print("\n🔒 Enhanced Security Features:")
+    print("   • Private key leak detection")
+    print("   • Comprehensive vulnerability scanning")
+    print("   • AI-powered security analysis")
+    print("   • URL cleaning and standardization")
     print("\n🌐 API Available at: http://localhost:8000")
     print("📚 Docs Available at: http://localhost:8000/docs")
-    print("="*60)
+    print("="*70)
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "simple_fastapi_server:app",
+        "enhanced_fastapi_server:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
