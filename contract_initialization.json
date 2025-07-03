@@ -1,0 +1,173 @@
+{
+  "initialization_completed_at": "2025-07-03T17:26:43.127232",
+  "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+  "network": "Flow Testnet",
+  "repositories_registered": 5,
+  "violations_created": 3,
+  "total_gas_used": 850000,
+  "repositories": [
+    {
+      "repo_id": 1,
+      "github_url": "https://github.com/onflow/flow-go",
+      "name": "flow-go",
+      "description": "Flow blockchain implementation in Go",
+      "language": "Go",
+      "license_type": "Apache-2.0",
+      "owner": "onflow",
+      "repo_hash": "91e9fd5843e26b1c3f8fd0188c2202efdb268ee7c355b9be734e5a88e2d842f8",
+      "fingerprint": "02b4d1d4b4f3cb12ba1866bccddb60b6ccfa49929c30081d2967ac61ba7401bd",
+      "key_features": [
+        "Go implementation",
+        "flow-go core functionality",
+        "Open source Apache-2.0 licensed",
+        "Maintained by onflow"
+      ],
+      "processed_at": "2025-07-03T17:26:38.104869",
+      "success": true,
+      "tx_hash": "0x769021e67c1f12e82bc29c193b6c0888d5e67c3154ea01bf90c8e1c07e4609e7",
+      "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+      "gas_used": 170000,
+      "network": "Flow Testnet",
+      "block_number": 559998,
+      "registered_at": "2025-07-03T17:26:38.105111"
+    },
+    {
+      "repo_id": 2,
+      "github_url": "https://github.com/onflow/cadence",
+      "name": "cadence",
+      "description": "Cadence smart contract language",
+      "language": "Go",
+      "license_type": "Apache-2.0",
+      "owner": "onflow",
+      "repo_hash": "efbbcfae37d73be2c27f1af2b4bc9e4f981871c219784b6ef4eab4759309c35a",
+      "fingerprint": "070624305778f628c7f62ab412b39b931b7f3aed7ff843d88caaf9da5b862f81",
+      "key_features": [
+        "Go implementation",
+        "cadence core functionality",
+        "Open source Apache-2.0 licensed",
+        "Maintained by onflow"
+      ],
+      "processed_at": "2025-07-03T17:26:38.104927",
+      "success": true,
+      "tx_hash": "0x7f3b813d8efe8c394a4ec50ff28bb1a407354188e72dbd989937bae119ffe32f",
+      "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+      "gas_used": 170000,
+      "network": "Flow Testnet",
+      "block_number": 559999,
+      "registered_at": "2025-07-03T17:26:39.110381"
+    },
+    {
+      "repo_id": 3,
+      "github_url": "https://github.com/microsoft/vscode",
+      "name": "vscode",
+      "description": "Visual Studio Code editor",
+      "language": "TypeScript",
+      "license_type": "MIT",
+      "owner": "microsoft",
+      "repo_hash": "58502fba7d3133e28bdeef54e8c7b5ef3d02a7f40724f72d8a49fbc010d0194d",
+      "fingerprint": "f9460163f9de03c87847c81e8fb7ffe581fec068d9559ee7eeb425d82773e1c8",
+      "key_features": [
+        "TypeScript implementation",
+        "vscode core functionality",
+        "Open source MIT licensed",
+        "Maintained by microsoft"
+      ],
+      "processed_at": "2025-07-03T17:26:38.104964",
+      "success": true,
+      "tx_hash": "0x51939330a10b258c46def1fab25ab3a10020de805d3dd9fef5c0ae22a38738f5",
+      "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+      "gas_used": 170000,
+      "network": "Flow Testnet",
+      "block_number": 560000,
+      "registered_at": "2025-07-03T17:26:40.115656"
+    },
+    {
+      "repo_id": 4,
+      "github_url": "https://github.com/facebook/react",
+      "name": "react",
+      "description": "React JavaScript library",
+      "language": "JavaScript",
+      "license_type": "MIT",
+      "owner": "facebook",
+      "repo_hash": "19ded15ea2c822ae1000082e9388a186aa57c3972ddb90b8abb579d142c96852",
+      "fingerprint": "3e80f83d950d8b58d6e1b789320ee15e35c47b745ee2d7aa4a605180b47279a2",
+      "key_features": [
+        "JavaScript implementation",
+        "react core functionality",
+        "Open source MIT licensed",
+        "Maintained by facebook"
+      ],
+      "processed_at": "2025-07-03T17:26:38.104997",
+      "success": true,
+      "tx_hash": "0x0b816c20dd539b4245735177a80ede9b69e32ff3bb585971bb6fcfa7764de307",
+      "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+      "gas_used": 170000,
+      "network": "Flow Testnet",
+      "block_number": 560001,
+      "registered_at": "2025-07-03T17:26:41.116327"
+    },
+    {
+      "repo_id": 5,
+      "github_url": "https://github.com/ethereum/solidity",
+      "name": "solidity",
+      "description": "Solidity smart contract language",
+      "language": "C++",
+      "license_type": "GPL-3.0",
+      "owner": "ethereum",
+      "repo_hash": "818a0a61f4442da739c1719628a777571650f73802ba1258e1d9cc7999245d8c",
+      "fingerprint": "de608ffaf2381fe099de817fd486ddcaad7db2c79072e3a798aa7a44de98d65b",
+      "key_features": [
+        "C++ implementation",
+        "solidity core functionality",
+        "Open source GPL-3.0 licensed",
+        "Maintained by ethereum"
+      ],
+      "processed_at": "2025-07-03T17:26:38.105026",
+      "success": true,
+      "tx_hash": "0xf4983016dc95e4d2ad04e7ab46ca7e94dbafa6751a1e4770af955102e059bb73",
+      "contract_address": "0x5fa19b4a48C20202055c8a6fdf16688633617D50",
+      "gas_used": 170000,
+      "network": "Flow Testnet",
+      "block_number": 560002,
+      "registered_at": "2025-07-03T17:26:42.121615"
+    }
+  ],
+  "violations": [
+    {
+      "violation_id": 1,
+      "original_repo_id": 1,
+      "original_repo_name": "flow-go",
+      "violating_url": "https://github.com/fake-user/flow-copy",
+      "similarity_score": 0.85,
+      "reason": "Copied core Flow blockchain implementation",
+      "evidence_hash": "6312e94fa8850c118e7075273a4a4202b22d7667bd24795a28c2c214fd4c0cf8",
+      "tx_hash": "0xd57ff207abd6ce71b95e0f380d619937d92fe27e7abbd6db071f08bacfd8cc88",
+      "status": "pending",
+      "reported_at": "2025-07-03T17:26:43.127026"
+    },
+    {
+      "violation_id": 2,
+      "original_repo_id": 3,
+      "original_repo_name": "vscode",
+      "violating_url": "https://github.com/clone-user/code-editor",
+      "similarity_score": 0.72,
+      "reason": "Similar editor functionality and UI patterns",
+      "evidence_hash": "45b1da6a67706b725749246c04b9dbc756f858c5bff8c59ba197f85740f4884d",
+      "tx_hash": "0x0228289576f03a6e62ee913da7a7b80dc0ab2e3b8f7437c673d08851d951fa97",
+      "status": "pending",
+      "reported_at": "2025-07-03T17:26:43.127092"
+    },
+    {
+      "violation_id": 3,
+      "original_repo_id": 4,
+      "original_repo_name": "react",
+      "violating_url": "https://github.com/copy-cat/react-clone",
+      "similarity_score": 0.91,
+      "reason": "Direct copy of React component system",
+      "evidence_hash": "5af8f41feb4fc02fecbe243f5ff201c8801c10db925f3fc7f942cd3e0ba2b698",
+      "tx_hash": "0x602ca554dd3f24d74139608e36707db96ca7b5db3ed336fdf5f81fd55e63b7c4",
+      "status": "pending",
+      "reported_at": "2025-07-03T17:26:43.127133"
+    }
+  ]
+}

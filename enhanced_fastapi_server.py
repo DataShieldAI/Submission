@@ -9,9 +9,13 @@ import os
 import uuid
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+
 
 # Import our enhanced agent
-from enhanced_agent_with_security import EnhancedGitHubProtectionAgent
+from enhanced_agent_with_security import SimpleGitHubProtectionAgent as EnhancedGitHubProtectionAgent
+
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

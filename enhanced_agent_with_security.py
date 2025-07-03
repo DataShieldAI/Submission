@@ -14,7 +14,7 @@ import shutil
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import BaseTool, StructuredTool
 from langchain.schema import BaseMessage
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 
 # LlamaIndex imports (simplified)
