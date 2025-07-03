@@ -1,5 +1,6 @@
-# need to integrate ngrok
-
+"""
+Enhanced FastAPI Server for GitHub Protection Agent
+"""
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,11 +15,10 @@ import logging
 from dotenv import load_dotenv
 
 # Import our enhanced agent
-from enhanced_agent_with_security import EnhancedGitHubProtectionAgent
+from github_protection_agent import EnhancedGitHubProtectionAgent, setup_logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -48,7 +48,7 @@ class RepositoryRegistration(BaseModel):
     description: Optional[str] = None
 
 class SecurityAuditRequest(BaseModel):
-    github_url: HttpUrl
+    url: HttpUrl
     audit_type: str = "comprehensive"
     include_private_keys: bool = True
     include_vulnerabilities: bool = True
@@ -166,8 +166,8 @@ async def comprehensive_security_audit(request: SecurityAuditRequest) -> Securit
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
     try:
-        logger.info(f"Starting comprehensive security audit: {request.github_url}")
-        result = agent.comprehensive_security_audit(str(request.github_url))
+        logger.info(f"Starting comprehensive security audit: {request.url}")
+        result = agent.comprehensive_security_audit(str(request.url))
         
         return SecurityAuditResult(**result)
         
