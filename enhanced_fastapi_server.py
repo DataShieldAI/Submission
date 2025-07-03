@@ -11,20 +11,20 @@ from datetime import datetime
 import logging
 from dotenv import load_dotenv
 
-
 # Import our enhanced agent
-from enhanced_agent_with_security import SimpleGitHubProtectionAgent as EnhancedGitHubProtectionAgent
-
-load_dotenv()
+from enhanced_agent_with_security import EnhancedGitHubProtectionAgent
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
 app = FastAPI(
     title="Enhanced GitHub Repository Protection API",
     description="AI-powered GitHub repository protection with comprehensive security auditing and blockchain integration",
-    version="2.0.0"
+    version="3.0.0"
 )
 
 # CORS middleware
@@ -72,7 +72,9 @@ class SecurityAuditResult(BaseModel):
     critical_findings: Optional[int] = None
     high_findings: Optional[int] = None
     medium_findings: Optional[int] = None
+    low_findings: Optional[int] = None
     ai_summary: Optional[str] = None
+    pdf_report: Optional[str] = None
     error: Optional[str] = None
 
 # In-memory job tracking
@@ -116,7 +118,7 @@ async def root():
     
     return {
         "service": "Enhanced GitHub Repository Protection API",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "status": "healthy",
         "agent_ready": agent is not None,
         "contract_address": os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50'),
@@ -127,12 +129,13 @@ async def root():
         },
         "database": "In-memory (no setup required)",
         "enhanced_features": [
-            "Comprehensive security auditing",
-            "Private key leak detection",
-            "Vulnerability scanning",
-            "URL cleaning and standardization",
-            "Repository analysis and fingerprinting",
-            "AI-powered violation detection",
+            "Comprehensive security auditing with secret detection",
+            "Multi-platform URL analysis (GitHub, Reddit, Twitter, Images)",
+            "AI-powered URL cleaning and categorization",
+            "PDF security report generation",
+            "Historical commit scanning for leaked secrets",
+            "Advanced pattern recognition for API keys and tokens",
+            "Image watermark detection support",
             "Natural language agent interface",
             "Flow blockchain integration"
         ]
@@ -140,12 +143,12 @@ async def root():
 
 @app.post("/clean-urls")
 async def clean_github_urls(request: URLCleaningRequest) -> Dict:
-    """Clean and standardize GitHub URLs from text input"""
+    """Clean and standardize URLs from text input with AI categorization"""
     if not agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
     try:
-        logger.info("Cleaning GitHub URLs from text input")
+        logger.info("Cleaning and analyzing URLs from text input")
         result = agent.clean_github_urls(request.url_text)
         
         return result
@@ -156,7 +159,7 @@ async def clean_github_urls(request: URLCleaningRequest) -> Dict:
 
 @app.post("/security-audit")
 async def comprehensive_security_audit(request: SecurityAuditRequest) -> SecurityAuditResult:
-    """Perform comprehensive security audit including private key detection"""
+    """Perform comprehensive security audit with multi-platform support"""
     if not agent:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
@@ -244,7 +247,7 @@ async def full_protection_workflow(request: RepositoryRegistration) -> Dict:
         return {
             "success": True,
             "workflow_result": result,
-            "message": "Enhanced protection workflow completed with security audit"
+            "message": "Enhanced protection workflow completed with comprehensive security audit"
         }
         
     except Exception as e:
@@ -316,10 +319,12 @@ async def agent_query(request: AgentQueryRequest) -> Dict:
         You are an Enhanced GitHub Repository Protection Agent with comprehensive security auditing capabilities. 
         Help the user with:
         - Repository analysis and protection
-        - Comprehensive security auditing (private keys, vulnerabilities)
+        - Comprehensive security auditing (private keys, vulnerabilities, secrets)
+        - Multi-platform URL cleaning and analysis (GitHub, Reddit, Twitter, Images)
         - License generation and compliance
         - Violation detection and DMCA notices
-        - URL cleaning and standardization
+        - Image watermark detection
+        - PDF security report generation
         
         User query: {request.query}
         
@@ -409,7 +414,7 @@ async def get_enhanced_stats() -> Dict:
             "ai_backend": "Local Model" if os.getenv('USE_LOCAL_MODEL') == 'true' else "OpenAI",
             "database": "In-memory",
             "blockchain": "Flow Testnet",
-            "enhanced_features": "Security Auditing Enabled"
+            "enhanced_features": "Comprehensive Security Auditing Enabled"
         }
     }
 
@@ -425,10 +430,15 @@ async def get_agent_status() -> Dict:
             "repository_analysis",
             "code_fingerprinting", 
             "comprehensive_security_auditing",
+            "multi_platform_secret_detection",
+            "historical_commit_scanning",
             "private_key_leak_detection",
             "vulnerability_scanning",
             "violation_detection",
-            "url_cleaning_and_standardization",
+            "multi_platform_url_cleaning",
+            "ai_powered_url_categorization",
+            "image_watermark_detection",
+            "pdf_security_report_generation",
             "license_generation",
             "dmca_generation",
             "natural_language_interface"
@@ -442,10 +452,13 @@ async def get_agent_status() -> Dict:
         "contract_address": os.getenv('CONTRACT_ADDRESS'),
         "database": "In-memory (no external database required)",
         "enhanced_features": {
-            "security_scanner": "✅ Active",
-            "private_key_detection": "✅ Active",
-            "vulnerability_scanning": "✅ Active",
-            "url_cleaning": "✅ Active"
+            "comprehensive_security_scanner": "✅ Active",
+            "multi_platform_support": "✅ Active",
+            "secret_pattern_detection": "✅ Active",
+            "historical_commit_scanning": "✅ Active",
+            "ai_url_categorization": "✅ Active",
+            "pdf_report_generation": "✅ Active" if agent else "❌ Inactive",
+            "image_watermark_detection": "✅ Active" if agent else "❌ Inactive"
         }
     }
 
@@ -465,22 +478,26 @@ async def global_exception_handler(request, exc):
 # Enhanced startup message
 @app.on_event("startup")
 async def startup_message():
-    print("\n" + "="*70)
-    print("🛡️  Enhanced GitHub Repository Protection Agent")
-    print("="*70)
+    print("\n" + "="*80)
+    print("🛡️  ENHANCED GitHub Repository Protection Agent v3.0")
+    print("="*80)
     print("✅ FastAPI Server Started")
     print(f"🤖 AI Backend: {'Local Model' if os.getenv('USE_LOCAL_MODEL') == 'true' else 'OpenAI'}")
     print("💾 Database: In-memory (no setup required)")
     print("🔗 Blockchain: Flow Testnet")
     print(f"📡 Contract: {os.getenv('CONTRACT_ADDRESS', '0x5fa19b4a48C20202055c8a6fdf16688633617D50')}")
     print("\n🔒 Enhanced Security Features:")
-    print("   • Private key leak detection")
-    print("   • Comprehensive vulnerability scanning")
-    print("   • AI-powered security analysis")
-    print("   • URL cleaning and standardization")
+    print("   • Comprehensive secret detection (AWS, GitHub, OpenAI, etc.)")
+    print("   • Historical commit scanning for leaked credentials")
+    print("   • Multi-platform URL analysis (GitHub, Reddit, Twitter, Images)")
+    print("   • AI-powered URL cleaning and categorization")
+    print("   • PDF security report generation")
+    print("   • Image watermark detection support")
+    print("   • Advanced pattern recognition for 15+ secret types")
     print("\n🌐 API Available at: http://localhost:8000")
     print("📚 Docs Available at: http://localhost:8000/docs")
-    print("="*70)
+    print("📊 Stats Available at: http://localhost:8000/stats")
+    print("="*80)
 
 if __name__ == "__main__":
     import uvicorn
