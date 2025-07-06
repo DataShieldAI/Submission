@@ -4,6 +4,22 @@
 
 ---
 
+## One Sentence Description
+
+DataShield is an AI-powered agent that uses the Flow blockchain to help developers detect unauthorized use of their code, prove authorship, and generate on-chain records for licensing and takedown.
+
+## Short Description of What We Integrated with Flow
+
+We deployed a Solidity smart contract on Flow EVM Testnet that:
+    •    Registers code ownership using cryptographic fingerprints
+    •    Logs violations with similarity scores and IPFS-hosted evidence
+    •    Links this data to Flow and enables enforcement
+
+We also integrated Flow Client Library (FCL) in the frontend to support wallet connection, gas fees, and on-chain interactions with the smart contract.
+
+
+
+
 ## 🚀 Overview
 
 This project is an advanced AI agent that helps developers protect their GitHub repositories from unauthorized use. The system combines powerful AI analysis with the security and immutability of the **Flow blockchain**, which acts as the core trust layer for all operations. By creating an on-chain record of code ownership, the agent can confidently and automatically monitor for theft, generate legal notices, and safeguard intellectual property.
@@ -209,8 +225,5 @@ function reportViolation(
 ### Team:
 
 
-Telegram: @P_Pwoo
-Discord: ppwoo
-
-
-Jamie Jamerson 
+    •    Jamie – Product, UI, Frontend - Discord: jamie23000
+    •    @P_Pwoo – Backend/AI/Smart contracts - Telegram: @P_Pwoo | Discord: ppwoo
