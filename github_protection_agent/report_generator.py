@@ -130,7 +130,7 @@ class ReportGenerator:
             logger.error(f"❌ Error generating PDF report: {e}")
             return None
     
-    def generate_violation_report(self, violations: List[Dict]) -> str:
+    def generate_violation_report(self, violations: list[Dict]) -> str:
         """Generate violation report"""
         
         if not PDF_AVAILABLE:

@@ -4,6 +4,8 @@ Defines patterns for detecting various types of secrets and credentials
 """
 import re
 from typing import Dict
+from dotenv import load_dotenv
+load_dotenv()
 
 
 class SecretPatterns:
@@ -134,12 +136,12 @@ class SecretPatterns:
             r'^replace[_\s]*this',
             r'^change[_\s]*me',
             r'^\.\.\.',  # ...
-            r'^x+,  # xxx, XXXX
-            r'^0+,  # 000, 0000
-            r'^1+,  # 111, 1111
+            r'^x+$', # xxx, XXXX
+            r'^0+$', # 000, 0000
+            r'^1+$', # 111, 1111
             r'^(abc|def|test|sample|demo)123',  # abc123, test123
-            r'^sk-[x]{48},  # OpenAI placeholder sk-xxxxxxxx...
-            r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12},  # UUID placeholder
+            r'^sk-[x]{48}$',  # OpenAI placeholder sk-xxxxxxxx...
+            r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', # UUID placeholder
         ]
         
         for pattern in placeholder_patterns:

@@ -9,6 +9,8 @@ import signal
 import threading
 from pathlib import Path
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 class AgentBootstrap:
     def __init__(self):

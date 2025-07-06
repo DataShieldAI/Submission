@@ -22,6 +22,8 @@ from .url_processor import URLProcessor
 from .violation_detector import ViolationDetector
 from .report_generator import ReportGenerator
 from .utils import setup_logging
+from dotenv import load_dotenv
+load_dotenv()
 
 logger = setup_logging(__name__)
 

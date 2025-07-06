@@ -28,6 +28,9 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.openai import OpenAI as LlamaOpenAI
 from llama_index.llms.ollama import Ollama
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # PDF generation
 try:
     from reportlab.lib.pagesizes import letter

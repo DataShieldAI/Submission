@@ -4,6 +4,8 @@ Main entry point for the Enhanced GitHub Protection Agent
 import os
 import sys
 from github_protection_agent import EnhancedGitHubProtectionAgent, setup_logging
+from dotenv import load_dotenv
+load_dotenv()
 
 logger = setup_logging(__name__)
 
