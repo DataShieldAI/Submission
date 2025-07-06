@@ -20,7 +20,6 @@
       "AgentKit",
       "LangChain",
       "LlamaIndex",
-      "Anthropic Claude",
       "Python",
       "FastAPI",
       "React",
