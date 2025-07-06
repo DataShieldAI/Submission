@@ -4,7 +4,7 @@
     "description": "A comprehensive system that combines LlamaIndex for intelligent code analysis, LangChain for natural language processing, and Flow blockchain for immutable ownership records. The agent automatically detects code theft, generates legal documentation, and provides security auditing for GitHub repositories.",
     "team": [
       {
-        "name": "Developer Name",
+        "name": "Developer Name?",
         "email": "developer@example.com",
         "role": "Lead Developer",
         "github": "github.com/developer",
