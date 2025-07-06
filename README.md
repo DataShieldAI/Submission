@@ -327,4 +327,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-x
+
+
+HOW TO RUN
+
+run fastapi backend to expose endpoints:
+python enhanced_fastapi_server_with_security.py
+
+OR, PLAYGROUND MODE:
+python main_enhanced.py 
+
+Allowing you to play around with the agents endpoints
