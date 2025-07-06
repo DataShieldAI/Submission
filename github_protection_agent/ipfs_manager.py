@@ -7,6 +7,8 @@ import requests
 import json
 from typing import Dict, Optional
 from .utils import setup_logging
+from dotenv import load_dotenv
+load_dotenv()
 
 logger = setup_logging(__name__)
 

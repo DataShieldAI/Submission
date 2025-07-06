@@ -7,6 +7,8 @@ import requests
 from typing import List, Dict, Set
 from difflib import SequenceMatcher
 import re
+from dotenv import load_dotenv
+load_dotenv()
 
 from .utils import setup_logging
 

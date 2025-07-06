@@ -11,6 +11,8 @@ import requests
 from typing import List, Dict
 from datetime import datetime
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+load_dotenv()
 
 from .security_scanner import SecurityScanner
 from .utils import setup_logging

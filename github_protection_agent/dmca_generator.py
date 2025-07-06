@@ -11,6 +11,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.colors import red, black, blue
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from dotenv import load_dotenv
+load_dotenv()
 
 from .utils import setup_logging
 

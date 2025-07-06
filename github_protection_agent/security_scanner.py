@@ -11,6 +11,8 @@ import requests
 from typing import List, Dict
 from datetime import datetime
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+load_dotenv()
 
 from .utils import setup_logging
 from .secret_patterns import SecretPatterns

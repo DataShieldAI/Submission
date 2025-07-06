@@ -8,6 +8,8 @@ import hashlib
 import json
 from typing import Dict, List
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 from .utils import setup_logging
 

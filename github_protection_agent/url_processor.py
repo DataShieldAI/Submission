@@ -6,6 +6,8 @@ import re
 import json
 from typing import List, Dict
 from urllib.parse import urlparse, parse_qs
+from dotenv import load_dotenv
+load_dotenv()
 
 from .utils import setup_logging
 
